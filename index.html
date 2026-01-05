@@ -66,6 +66,7 @@
 
         .nav-item:hover { background: #f5f5f5; color: var(--primary); }
         .nav-item.active { background: #E3F2FD; color: var(--primary); }
+        .nav-item i { font-style: normal; margin-right: 5px; }
 
         /* === 右侧主区域 === */
         .main {
@@ -89,6 +90,7 @@
         }
 
         h2 { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 15px; font-size: 20px; }
+        label { font-weight: 600; font-size: 14px; color: #555; display: block; margin-bottom: 5px; }
 
         textarea, input, select {
             width: 100%;
@@ -96,9 +98,13 @@
             border: 1px solid #ddd;
             border-radius: 6px;
             box-sizing: border-box;
-            margin: 10px 0 20px 0;
+            margin: 5px 0 20px 0;
             font-family: monospace;
         }
+
+        /* 专门针对物理参数输入的样式优化 */
+        .phy-inputs { display: flex; gap: 15px; }
+        .phy-inputs input { flex: 1; }
 
         button {
             background: var(--primary);
@@ -110,6 +116,7 @@
             font-size: 15px;
             font-weight: 600;
             transition: 0.2s;
+            width: 100%;
         }
         button:hover { filter: brightness(1.1); }
 
@@ -146,8 +153,25 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            flex-direction: column;
         }
-        .result-box img { max-width: 200px; border: 5px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .result-box img { max-width: 300px; border-radius: 8px; border: 1px solid #eee; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+
+        /* === 新增：物理图例说明样式 === */
+        .phy-legend {
+            margin-top: 20px;
+            width: 100%;
+            max-width: 300px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #eee;
+            text-align: left;
+        }
+        .phy-legend h3 { margin: 0 0 10px 0; font-size: 14px; color: #333; display: flex; align-items: center; }
+        .phy-legend ul { list-style: none; padding: 0; margin: 0; }
+        .phy-legend li { display: flex; align-items: center; font-size: 13px; color: #555; margin-bottom: 8px; }
+        .phy-legend .swatch { display: inline-block; width: 16px; height: 16px; margin-right: 10px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
 
     </style>
 </head>
@@ -158,9 +182,10 @@
             <div class="status-dot"></div>
             阿里云控制台
         </div>
-        <div class="nav-item active" onclick="switchTab('dedup')">⚡ 文本智能去重</div>
-        <div class="nav-item" onclick="switchTab('qr')">🔗 云端二维码</div>
-        <div class="nav-item" onclick="switchTab('pwd')">🔐 安全密码生成</div>
+        <div class="nav-item active" onclick="switchTab('dedup')"><i>⚡</i> 文本智能去重</div>
+        <div class="nav-item" onclick="switchTab('qr')"><i>🔗</i> 云端二维码</div>
+        <div class="nav-item" onclick="switchTab('pwd')"><i>🔐</i> 安全密码生成</div>
+        <div class="nav-item" onclick="switchTab('phy')"><i>⚛️</i> 物理仿真模拟</div>
     </div>
 
     <div class="main">
@@ -168,7 +193,7 @@
         <div id="panel-dedup" class="panel active">
             <div class="card">
                 <h2>☁️ 文本去重 (Cloud Deduplication)</h2>
-                <p style="color:#666; font-size:14px">数据将上传至阿里云北京节点进行集合运算。</p>
+                <p style="color:#666; font-size:14px">数据将上传至阿里云北京节点进行 Python 集合运算。</p>
                 <textarea id="inp-dedup" rows="6" placeholder="输入重复列表..."></textarea>
                 <button onclick="runCloudTask('dedup')">调用云函数</button>
             </div>
@@ -194,6 +219,27 @@
             </div>
         </div>
 
+        <div id="panel-phy" class="panel">
+            <div class="card">
+                <h2>⚛️ 2D 波动方程数值求解 (FDM Solver)</h2>
+                <p style="color:#666; font-size:14px; line-height:1.6">
+                    云端将构建 100x100 网格，利用 Numpy 求解偏微分方程：<br>
+                    <code>∂²u/∂t² = c²∇²u</code>
+                </p>
+                
+                <label>干扰源位置 (X, Y 坐标 0.0 - 1.0):</label>
+                <div class="phy-inputs">
+                    <input type="number" id="phy-x" value="0.5" step="0.1" max="1" min="0" placeholder="X (0-1)">
+                    <input type="number" id="phy-y" value="0.5" step="0.1" max="1" min="0" placeholder="Y (0-1)">
+                </div>
+
+                <label>演化时间步数 (Steps): <span id="step-val">50</span></label>
+                <input type="range" id="phy-steps" min="10" max="150" value="50" oninput="document.getElementById('step-val').innerText=this.value">
+                
+                <button onclick="runCloudTask('phy')">🚀 启动云端物理引擎</button>
+            </div>
+        </div>
+
         <div class="card" id="result-card" style="display:none">
             <h2>计算结果 (Output)</h2>
             <div id="final-result" class="result-box"></div>
@@ -207,7 +253,7 @@
     </div>
 
 <script>
-    // 👇👇👇👇 必须改成你自己的真实地址！！！ 👇👇👇👇
+    // 👇👇👇 你的真实 API 地址 (保持不变) 👇👇👇
     const API_URL = "https://text-dedup-func-mac-too-service-zepxdnfuxj.cn-beijing.fcapp.run";
 
     function switchTab(id) {
@@ -221,7 +267,6 @@
         document.getElementById('result-card').style.display = 'none';
     }
 
-    // 写日志的函数
     function log(type, msg) {
         const term = document.getElementById('terminal');
         const time = new Date().toLocaleTimeString('en-US', {hour12:false}) + "." + Math.floor(Math.random()*999);
@@ -237,23 +282,32 @@
         </div>`;
         
         term.innerHTML += html;
-        term.scrollTop = term.scrollHeight; // 自动滚动到底部
+        term.scrollTop = term.scrollHeight; 
     }
 
     async function runCloudTask(type) {
         // 1. 准备数据
         let payload = {};
+        
         if(type === 'dedup') {
             const val = document.getElementById('inp-dedup').value;
             if(!val) return alert("请输入内容");
             payload = { action: 'dedup', content: val };
-        } else if (type === 'qr') {
+        } 
+        else if (type === 'qr') {
             const val = document.getElementById('inp-qr').value;
             if(!val) return alert("请输入内容");
             payload = { action: 'qr', text: val };
-        } else if (type === 'pwd') {
+        } 
+        else if (type === 'pwd') {
             const val = document.getElementById('inp-pwd-len').value;
             payload = { action: 'password', length: val };
+        }
+        else if (type === 'phy') {
+            const x = document.getElementById('phy-x').value;
+            const y = document.getElementById('phy-y').value;
+            const steps = document.getElementById('phy-steps').value;
+            payload = { action: 'phy_wave', cx: x, cy: y, steps: steps };
         }
 
         // 2. 模拟连接过程
@@ -267,6 +321,11 @@
         await new Promise(r => setTimeout(r, 200)); 
         log('NETWORK', 'DNS 解析: ' + API_URL.split('/')[2]);
         log('INFO', '建立 SSL/TLS 安全通道...');
+        
+        if(type === 'phy') {
+            log('INFO', '加载云端 Numpy/Matplotlib 科学计算库...');
+        }
+
         await new Promise(r => setTimeout(r, 300));
         log('UPLOAD', `发送 Payload 数据包 (${JSON.stringify(payload).length} bytes)...`);
         
@@ -283,7 +342,6 @@
 
             const endTime = Date.now();
             const duration = (endTime - startTime) / 1000;
-
             const reqId = res.headers.get("x-fc-request-id") || "FC-" + Math.random().toString(36).substr(2, 9).toUpperCase();
 
             log('SUCCESS', `收到服务器响应 (Status: ${res.status})`);
@@ -300,7 +358,27 @@
                 resultBox.innerHTML = `<span style="color:red">❌ ${data.error}</span>`;
             } else if (data.type === 'image') {
                 log('RENDER', '解析 Base64 图像数据...');
-                resultBox.innerHTML = `<img src="${data.result}">`;
+                
+                // 构建基础图片HTML
+                let htmlStr = `<img src="${data.result}">`;
+
+                // === 🔥 新增：如果是物理仿真，追加一个图例说明 🔥 ===
+                if(type === 'phy') {
+                    htmlStr += `
+                        <div class="phy-legend">
+                            <h3>🗺️ 热力图说明 (Legend)</h3>
+                            <ul>
+                                <li><span class="swatch" style="background: #FCFDBF;"></span> <b>亮黄色</b>：高波峰 / 能量最大点 (Peak)</li>
+                                <li><span class="swatch" style="background: #B73779;"></span> <b>紫红色</b>：波浪扩散区域 (Ripples)</li>
+                                <li><span class="swatch" style="background: #000004;"></span> <b>暗黑色</b>：平静水面 / 零振幅区 (Calm)</li>
+                            </ul>
+                        </div>
+                    `;
+                    log('INFO', '加载物理场可视化图例...');
+                }
+                
+                resultBox.innerHTML = htmlStr;
+
             } else {
                 log('IO', '写入文本结果...');
                 resultBox.innerHTML = `<pre>${data.result}</pre>`;
@@ -315,4 +393,3 @@
 
 </body>
 </html>
-
