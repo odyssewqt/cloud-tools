@@ -11,7 +11,6 @@
             --bg: #F0F2F5;
             --terminal-bg: #1E1E1E;
             --terminal-text: #00FF00;
-            --code-bg: #282c34;
         }
 
         body {
@@ -68,7 +67,7 @@
 
         .nav-item:hover { background: #f5f5f5; color: var(--primary); }
         .nav-item.active { background: #E3F2FD; color: var(--primary); }
-        .nav-item i { font-style: normal; width: 20px; text-align: center; }
+        .nav-item i { font-style: normal; width: 20px; text-align: center; margin-right: 8px; }
 
         /* === 右侧主区域 === */
         .main {
@@ -104,22 +103,45 @@
             font-family: monospace;
         }
 
-        /* 物理仿真专用布局 */
+        /* 物理仿真布局 */
         .phy-inputs { display: flex; gap: 15px; }
         .phy-inputs input { flex: 1; }
 
-        /* 代码审计专用布局 */
-        .audit-container { display: flex; gap: 20px; height: 400px; }
+        /* 代码审计布局 */
+        .audit-container { display: flex; gap: 20px; height: 500px; }
         .code-editor { flex: 1; display: flex; flex-direction: column; }
-        .code-editor textarea { flex: 1; background: #f8f8f8; color: #333; resize: none; font-size: 13px; line-height: 1.5; border: 1px solid #ddd; }
-        .audit-result { flex: 1; background: #fff; border: 1px solid #eee; border-radius: 6px; padding: 20px; overflow-y: auto; font-size: 14px; line-height: 1.6; }
+        .code-editor textarea { 
+            flex: 1; 
+            background: #fff; 
+            color: #333; 
+            resize: none; 
+            font-size: 13px; 
+            line-height: 1.5; 
+            border: 2px solid #007AFF; 
+            border-radius: 6px;
+            padding: 15px;
+            font-family: 'Consolas', monospace;
+        }
+        .audit-result { 
+            flex: 1; 
+            background: #fff; 
+            border: 1px solid #eee; 
+            border-radius: 6px; 
+            padding: 20px; 
+            overflow-y: auto; 
+            font-size: 14px; 
+            line-height: 1.6; 
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.03);
+        }
         
-        /* Markdown 样式微调 */
+        /* Markdown 样式 */
         .audit-result h1, .audit-result h2, .audit-result h3 { color: #333; margin-top: 20px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
         .audit-result strong { color: #d9534f; }
         .audit-result code { background: #f5f5f5; padding: 2px 5px; border-radius: 3px; font-family: monospace; color: #c7254e; }
         .audit-result pre { background: #282c34; color: #abb2bf; padding: 10px; border-radius: 5px; overflow-x: auto; }
         .audit-result pre code { background: none; color: inherit; }
+        .audit-result ul { padding-left: 20px; }
+        .audit-result li { margin-bottom: 5px; }
 
         button {
             background: var(--primary);
@@ -134,8 +156,8 @@
             width: 100%;
         }
         button:hover { filter: brightness(1.1); }
-        button.btn-secondary { background: #6c757d; width: auto; padding: 8px 15px; font-size: 13px; }
 
+        /* 终端样式 */
         .terminal-window {
             background: var(--terminal-bg);
             border-radius: 8px;
@@ -157,7 +179,7 @@
         .log-success { color: #00ff00; }
         .log-warn { color: #ffbd2e; }
 
-        /* 结果展示区 */
+        /* 通用结果框（物理/二维码用） */
         .result-box {
             margin-top: 20px;
             padding: 20px;
@@ -229,16 +251,13 @@
                 <p style="color:#666; font-size:14px; line-height:1.6">
                     云端将构建 100x100 网格，利用 Numpy 求解偏微分方程：<code>∂²u/∂t² = c²∇²u</code>
                 </p>
-                
                 <label>干扰源位置 (X, Y):</label>
                 <div class="phy-inputs">
                     <input type="number" id="phy-x" value="0.5" step="0.1" max="1" min="0" placeholder="X">
                     <input type="number" id="phy-y" value="0.5" step="0.1" max="1" min="0" placeholder="Y">
                 </div>
-
                 <label>演化时间步数: <span id="step-val">50</span></label>
                 <input type="range" id="phy-steps" min="10" max="150" value="50" oninput="document.getElementById('step-val').innerText=this.value">
-                
                 <button onclick="runCloudTask('phy')">🚀 启动云端物理引擎</button>
             </div>
         </div>
@@ -247,25 +266,28 @@
             <div class="card" style="height: 100%;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                     <h2>🧠 AI 智能代码审计 (Powered by Qwen-Max)</h2>
-                    <select id="audit-lang" style="width: auto; margin:0;">
+                    <select id="audit-lang" style="width: auto; margin:0; padding: 5px 10px;">
                         <option value="Python">Python</option>
                         <option value="Javascript">Javascript</option>
                         <option value="Java">Java</option>
                         <option value="C++">C++</option>
                     </select>
                 </div>
-                
                 <div class="audit-container">
                     <div class="code-editor">
                         <label>📝 源代码输入:</label>
-                        <textarea id="audit-code" placeholder="// 请在此处粘贴代码...
-function test() {
-  console.log('Hello');
-}"></textarea>
+                        <textarea id="audit-code" placeholder="// 请在此处粘贴需要审查的代码..."></textarea>
                     </div>
                     <div class="audit-result" id="audit-output">
-                        <div style="color:#999; text-align:center; padding-top:40px;">
-                            等待审计...<br>AI 架构师将在此生成 Markdown 报告
+                        <h3>代码审计报告</h3>
+                        <div style="color:#999; margin-top:20px;">
+                            等待提交...<br>
+                            AI 架构师将从以下维度进行分析：
+                            <ul>
+                                <li>逻辑漏洞与 Bug</li>
+                                <li>性能瓶颈优化</li>
+                                <li>安全风险检测</li>
+                            </ul>
                         </div>
                     </div>
                 </div>
@@ -287,18 +309,24 @@ function test() {
     </div>
 
 <script>
-    // 👇👇👇 你的真实 API 地址 (请确认不需要修改) 👇👇👇
+    // 👇👇👇 你的真实 API 地址 👇👇👇
     const API_URL = "https://text-dedup-func-mac-too-service-zepxdnfuxj.cn-beijing.fcapp.run";
 
     function switchTab(id) {
+        // 1. 移除导航激活状态
         document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        // 2. 隐藏所有面板
         document.querySelectorAll('.panel').forEach(el => el.classList.remove('active'));
         
+        // 3. 激活当前面板
         event.currentTarget.classList.add('active');
         document.getElementById('panel-' + id).classList.add('active');
         
-        // 隐藏通用结果框 (物理/去重用)，代码审计有自己的结果框
-        if(id !== 'audit') document.getElementById('result-card').style.display = 'none';
+        // 🔥【关键修复】🔥
+        // 无论切到哪个 Tab，都强制隐藏底部的“通用结果框”
+        // 这样物理仿真的图就不会出现在 AI 界面，反之亦然
+        document.getElementById('result-card').style.display = 'none';
+        document.getElementById('final-result').innerHTML = ""; // 清空旧内容
     }
 
     function log(type, msg) {
@@ -343,7 +371,6 @@ function test() {
             const steps = document.getElementById('phy-steps').value;
             payload = { action: 'phy_wave', cx: x, cy: y, steps: steps };
         }
-        // === AI 审计参数 ===
         else if (type === 'audit') {
             const code = document.getElementById('audit-code').value;
             const lang = document.getElementById('audit-lang').value;
@@ -351,21 +378,20 @@ function test() {
             payload = { action: 'audit', code: code, lang: lang };
         }
 
-        // 2. 界面反馈
-        if(type !== 'audit') {
-            document.getElementById('result-card').style.display = 'block';
-            document.getElementById('final-result').innerHTML = "⏳ 计算中...";
+        // 2. 界面反馈 (分流处理)
+        if(type === 'audit') {
+             // AI 模式：只操作 AI 面板内的元素
+             document.getElementById('audit-output').innerHTML = "<div style='padding:20px; text-align:center;'>⏳ AI 正在逐行分析代码逻辑...<br>(可能需要 5-10 秒)</div>";
         } else {
-            document.getElementById('audit-output').innerHTML = "<div style='padding:20px; text-align:center;'>⏳ AI 正在逐行分析代码逻辑...<br>(可能需要 5-10 秒)</div>";
+             // 其他模式：显示通用结果框
+             document.getElementById('result-card').style.display = 'block';
+             document.getElementById('final-result').innerHTML = "⏳ 计算中...";
         }
         
         log('SYSTEM', `初始化请求: ${type.toUpperCase()}`);
         await new Promise(r => setTimeout(r, 200)); 
         log('NETWORK', 'DNS 解析: ' + API_URL.split('/')[2]);
         
-        if(type === 'audit') log('INFO', '调用阿里云通义千问 (Qwen-Max) 模型...');
-        if(type === 'phy') log('INFO', '加载云端 Numpy/Matplotlib...');
-
         await new Promise(r => setTimeout(r, 300));
         
         // 3. 发送请求
@@ -388,31 +414,30 @@ function test() {
 
             const data = await res.json();
 
-            // 4. 处理结果
+            // 4. 处理结果 (严格分流)
             if (data.error) {
                 log('ERROR', 'API 报错: ' + data.error);
                 alert("出错啦: " + data.error);
                 return;
             }
 
-            // === 特殊处理 AI 审计结果 ===
+            // === A. 如果是 AI 审计 ===
             if (type === 'audit') {
                 log('RENDER', '渲染 Markdown 审计报告...');
                 if (data.status === 'success') {
-                    // 使用 marked 库将 Markdown 转为 HTML
                     document.getElementById('audit-output').innerHTML = marked.parse(data.data);
                 } else {
                     document.getElementById('audit-output').innerHTML = `<span style="color:red">错误: ${data.message}</span>`;
                 }
-                return; // 结束，不跑下面的逻辑
+                // 重要：直接返回，不要碰下面的 final-result
+                return; 
             }
 
-            // === 处理其他结果 ===
+            // === B. 如果是其他功能 (物理/二维码等) ===
             const resultBox = document.getElementById('final-result');
             if (data.type === 'image') {
                 resultBox.innerHTML = `<img src="${data.result}">`;
                 if(type === 'phy') {
-                    // 追加物理图例
                     resultBox.innerHTML += `
                         <div class="phy-legend">
                             <h3>🗺️ 热力图说明</h3>
@@ -431,7 +456,7 @@ function test() {
         } catch (e) {
             log('ERROR', '网络故障: ' + e.message);
             if(type === 'audit') {
-                document.getElementById('audit-output').innerHTML = "❌ 网络请求失败，请检查控制台";
+                document.getElementById('audit-output').innerHTML = "❌ 网络请求失败";
             } else {
                 document.getElementById('final-result').innerHTML = "❌ 失败";
             }
