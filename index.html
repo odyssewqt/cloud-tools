@@ -4,12 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Serverless Cloud Console</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root {
             --primary: #007AFF;
             --bg: #F0F2F5;
             --terminal-bg: #1E1E1E;
             --terminal-text: #00FF00;
+            --code-bg: #282c34;
         }
 
         body {
@@ -19,7 +21,7 @@
             background-color: var(--bg);
             height: 100vh;
             display: flex;
-            overflow: hidden; /* 防止双滚动条 */
+            overflow: hidden;
         }
 
         /* === 左侧导航 === */
@@ -66,7 +68,7 @@
 
         .nav-item:hover { background: #f5f5f5; color: var(--primary); }
         .nav-item.active { background: #E3F2FD; color: var(--primary); }
-        .nav-item i { font-style: normal; margin-right: 5px; }
+        .nav-item i { font-style: normal; width: 20px; text-align: center; }
 
         /* === 右侧主区域 === */
         .main {
@@ -102,9 +104,22 @@
             font-family: monospace;
         }
 
-        /* 专门针对物理参数输入的样式优化 */
+        /* 物理仿真专用布局 */
         .phy-inputs { display: flex; gap: 15px; }
         .phy-inputs input { flex: 1; }
+
+        /* 代码审计专用布局 */
+        .audit-container { display: flex; gap: 20px; height: 400px; }
+        .code-editor { flex: 1; display: flex; flex-direction: column; }
+        .code-editor textarea { flex: 1; background: #f8f8f8; color: #333; resize: none; font-size: 13px; line-height: 1.5; border: 1px solid #ddd; }
+        .audit-result { flex: 1; background: #fff; border: 1px solid #eee; border-radius: 6px; padding: 20px; overflow-y: auto; font-size: 14px; line-height: 1.6; }
+        
+        /* Markdown 样式微调 */
+        .audit-result h1, .audit-result h2, .audit-result h3 { color: #333; margin-top: 20px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .audit-result strong { color: #d9534f; }
+        .audit-result code { background: #f5f5f5; padding: 2px 5px; border-radius: 3px; font-family: monospace; color: #c7254e; }
+        .audit-result pre { background: #282c34; color: #abb2bf; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        .audit-result pre code { background: none; color: inherit; }
 
         button {
             background: var(--primary);
@@ -119,6 +134,7 @@
             width: 100%;
         }
         button:hover { filter: brightness(1.1); }
+        button.btn-secondary { background: #6c757d; width: auto; padding: 8px 15px; font-size: 13px; }
 
         .terminal-window {
             background: var(--terminal-bg);
@@ -156,19 +172,9 @@
             flex-direction: column;
         }
         .result-box img { max-width: 300px; border-radius: 8px; border: 1px solid #eee; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-
-        /* === 新增：物理图例说明样式 === */
-        .phy-legend {
-            margin-top: 20px;
-            width: 100%;
-            max-width: 300px;
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #eee;
-            text-align: left;
-        }
-        .phy-legend h3 { margin: 0 0 10px 0; font-size: 14px; color: #333; display: flex; align-items: center; }
+        
+        .phy-legend { margin-top: 20px; width: 100%; max-width: 300px; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #eee; text-align: left; }
+        .phy-legend h3 { margin: 0 0 10px 0; font-size: 14px; color: #333; }
         .phy-legend ul { list-style: none; padding: 0; margin: 0; }
         .phy-legend li { display: flex; align-items: center; font-size: 13px; color: #555; margin-bottom: 8px; }
         .phy-legend .swatch { display: inline-block; width: 16px; height: 16px; margin-right: 10px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
@@ -186,6 +192,7 @@
         <div class="nav-item" onclick="switchTab('qr')"><i>🔗</i> 云端二维码</div>
         <div class="nav-item" onclick="switchTab('pwd')"><i>🔐</i> 安全密码生成</div>
         <div class="nav-item" onclick="switchTab('phy')"><i>⚛️</i> 物理仿真模拟</div>
+        <div class="nav-item" onclick="switchTab('audit')"><i>🧠</i> AI 代码审计</div>
     </div>
 
     <div class="main">
@@ -193,7 +200,6 @@
         <div id="panel-dedup" class="panel active">
             <div class="card">
                 <h2>☁️ 文本去重 (Cloud Deduplication)</h2>
-                <p style="color:#666; font-size:14px">数据将上传至阿里云北京节点进行 Python 集合运算。</p>
                 <textarea id="inp-dedup" rows="6" placeholder="输入重复列表..."></textarea>
                 <button onclick="runCloudTask('dedup')">调用云函数</button>
             </div>
@@ -202,7 +208,6 @@
         <div id="panel-qr" class="panel">
             <div class="card">
                 <h2>☁️ 矢量二维码 (Cloud QR Gen)</h2>
-                <p style="color:#666; font-size:14px">使用云端 Segno 库实时渲染。</p>
                 <input type="text" id="inp-qr" placeholder="输入网址或文字...">
                 <button onclick="runCloudTask('qr')">开始渲染</button>
             </div>
@@ -211,7 +216,6 @@
         <div id="panel-pwd" class="panel">
             <div class="card">
                 <h2>☁️ 熵增密码 (Cloud Secrets)</h2>
-                <p style="color:#666; font-size:14px">利用云端 OS 随机数发生器生成。</p>
                 <input type="range" id="inp-pwd-len" min="8" max="64" value="16" oninput="document.getElementById('pwd-val').innerText=this.value">
                 <span style="float:right">长度: <b id="pwd-val">16</b></span>
                 <br><br>
@@ -223,20 +227,50 @@
             <div class="card">
                 <h2>⚛️ 2D 波动方程数值求解 (FDM Solver)</h2>
                 <p style="color:#666; font-size:14px; line-height:1.6">
-                    云端将构建 100x100 网格，利用 Numpy 求解偏微分方程：<br>
-                    <code>∂²u/∂t² = c²∇²u</code>
+                    云端将构建 100x100 网格，利用 Numpy 求解偏微分方程：<code>∂²u/∂t² = c²∇²u</code>
                 </p>
                 
-                <label>干扰源位置 (X, Y 坐标 0.0 - 1.0):</label>
+                <label>干扰源位置 (X, Y):</label>
                 <div class="phy-inputs">
-                    <input type="number" id="phy-x" value="0.5" step="0.1" max="1" min="0" placeholder="X (0-1)">
-                    <input type="number" id="phy-y" value="0.5" step="0.1" max="1" min="0" placeholder="Y (0-1)">
+                    <input type="number" id="phy-x" value="0.5" step="0.1" max="1" min="0" placeholder="X">
+                    <input type="number" id="phy-y" value="0.5" step="0.1" max="1" min="0" placeholder="Y">
                 </div>
 
-                <label>演化时间步数 (Steps): <span id="step-val">50</span></label>
+                <label>演化时间步数: <span id="step-val">50</span></label>
                 <input type="range" id="phy-steps" min="10" max="150" value="50" oninput="document.getElementById('step-val').innerText=this.value">
                 
                 <button onclick="runCloudTask('phy')">🚀 启动云端物理引擎</button>
+            </div>
+        </div>
+
+        <div id="panel-audit" class="panel">
+            <div class="card" style="height: 100%;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h2>🧠 AI 智能代码审计 (Powered by Qwen-Max)</h2>
+                    <select id="audit-lang" style="width: auto; margin:0;">
+                        <option value="Python">Python</option>
+                        <option value="Javascript">Javascript</option>
+                        <option value="Java">Java</option>
+                        <option value="C++">C++</option>
+                    </select>
+                </div>
+                
+                <div class="audit-container">
+                    <div class="code-editor">
+                        <label>📝 源代码输入:</label>
+                        <textarea id="audit-code" placeholder="// 请在此处粘贴代码...
+function test() {
+  console.log('Hello');
+}"></textarea>
+                    </div>
+                    <div class="audit-result" id="audit-output">
+                        <div style="color:#999; text-align:center; padding-top:40px;">
+                            等待审计...<br>AI 架构师将在此生成 Markdown 报告
+                        </div>
+                    </div>
+                </div>
+                <br>
+                <button onclick="runCloudTask('audit')">🚀 提交给 AI 架构师审查</button>
             </div>
         </div>
 
@@ -253,7 +287,7 @@
     </div>
 
 <script>
-    // 👇👇👇 你的真实 API 地址 (保持不变) 👇👇👇
+    // 👇👇👇 你的真实 API 地址 (请确认不需要修改) 👇👇👇
     const API_URL = "https://text-dedup-func-mac-too-service-zepxdnfuxj.cn-beijing.fcapp.run";
 
     function switchTab(id) {
@@ -263,8 +297,8 @@
         event.currentTarget.classList.add('active');
         document.getElementById('panel-' + id).classList.add('active');
         
-        // 隐藏结果，清空终端
-        document.getElementById('result-card').style.display = 'none';
+        // 隐藏通用结果框 (物理/去重用)，代码审计有自己的结果框
+        if(id !== 'audit') document.getElementById('result-card').style.display = 'none';
     }
 
     function log(type, msg) {
@@ -286,9 +320,9 @@
     }
 
     async function runCloudTask(type) {
-        // 1. 准备数据
         let payload = {};
         
+        // 1. 组装数据
         if(type === 'dedup') {
             const val = document.getElementById('inp-dedup').value;
             if(!val) return alert("请输入内容");
@@ -309,30 +343,35 @@
             const steps = document.getElementById('phy-steps').value;
             payload = { action: 'phy_wave', cx: x, cy: y, steps: steps };
         }
-
-        // 2. 模拟连接过程
-        document.getElementById('result-card').style.display = 'block';
-        document.getElementById('final-result').innerHTML = "⏳ 计算中...";
-        
-        const term = document.getElementById('terminal');
-        term.innerHTML = ""; 
-        
-        log('SYSTEM', '正在初始化请求...');
-        await new Promise(r => setTimeout(r, 200)); 
-        log('NETWORK', 'DNS 解析: ' + API_URL.split('/')[2]);
-        log('INFO', '建立 SSL/TLS 安全通道...');
-        
-        if(type === 'phy') {
-            log('INFO', '加载云端 Numpy/Matplotlib 科学计算库...');
+        // === AI 审计参数 ===
+        else if (type === 'audit') {
+            const code = document.getElementById('audit-code').value;
+            const lang = document.getElementById('audit-lang').value;
+            if(!code) return alert("写点代码再审吧！");
+            payload = { action: 'audit', code: code, lang: lang };
         }
 
-        await new Promise(r => setTimeout(r, 300));
-        log('UPLOAD', `发送 Payload 数据包 (${JSON.stringify(payload).length} bytes)...`);
+        // 2. 界面反馈
+        if(type !== 'audit') {
+            document.getElementById('result-card').style.display = 'block';
+            document.getElementById('final-result').innerHTML = "⏳ 计算中...";
+        } else {
+            document.getElementById('audit-output').innerHTML = "<div style='padding:20px; text-align:center;'>⏳ AI 正在逐行分析代码逻辑...<br>(可能需要 5-10 秒)</div>";
+        }
         
-        // 3. 真正发送请求
+        log('SYSTEM', `初始化请求: ${type.toUpperCase()}`);
+        await new Promise(r => setTimeout(r, 200)); 
+        log('NETWORK', 'DNS 解析: ' + API_URL.split('/')[2]);
+        
+        if(type === 'audit') log('INFO', '调用阿里云通义千问 (Qwen-Max) 模型...');
+        if(type === 'phy') log('INFO', '加载云端 Numpy/Matplotlib...');
+
+        await new Promise(r => setTimeout(r, 300));
+        
+        // 3. 发送请求
         const startTime = Date.now();
         try {
-            log('CLOUD', '等待阿里云函数实例唤醒 (Cold Start)...');
+            log('CLOUD', '等待实例唤醒 (Cold Start)...');
             
             const res = await fetch(API_URL, {
                 method: 'POST',
@@ -344,49 +383,58 @@
             const duration = (endTime - startTime) / 1000;
             const reqId = res.headers.get("x-fc-request-id") || "FC-" + Math.random().toString(36).substr(2, 9).toUpperCase();
 
-            log('SUCCESS', `收到服务器响应 (Status: ${res.status})`);
-            log('METRICS', `云端处理耗时: ${duration.toFixed(3)}s`);
-            log('TRACE', `Request ID: ${reqId}`);
+            log('SUCCESS', `响应完成 (Status: ${res.status})`);
+            log('METRICS', `耗时: ${duration.toFixed(3)}s | RequestID: ${reqId}`);
 
             const data = await res.json();
 
-            // 4. 显示结果
-            const resultBox = document.getElementById('final-result');
-            
+            // 4. 处理结果
             if (data.error) {
-                log('ERROR', '执行失败: ' + data.error);
-                resultBox.innerHTML = `<span style="color:red">❌ ${data.error}</span>`;
-            } else if (data.type === 'image') {
-                log('RENDER', '解析 Base64 图像数据...');
-                
-                // 构建基础图片HTML
-                let htmlStr = `<img src="${data.result}">`;
+                log('ERROR', 'API 报错: ' + data.error);
+                alert("出错啦: " + data.error);
+                return;
+            }
 
-                // === 🔥 新增：如果是物理仿真，追加一个图例说明 🔥 ===
+            // === 特殊处理 AI 审计结果 ===
+            if (type === 'audit') {
+                log('RENDER', '渲染 Markdown 审计报告...');
+                if (data.status === 'success') {
+                    // 使用 marked 库将 Markdown 转为 HTML
+                    document.getElementById('audit-output').innerHTML = marked.parse(data.data);
+                } else {
+                    document.getElementById('audit-output').innerHTML = `<span style="color:red">错误: ${data.message}</span>`;
+                }
+                return; // 结束，不跑下面的逻辑
+            }
+
+            // === 处理其他结果 ===
+            const resultBox = document.getElementById('final-result');
+            if (data.type === 'image') {
+                resultBox.innerHTML = `<img src="${data.result}">`;
                 if(type === 'phy') {
-                    htmlStr += `
+                    // 追加物理图例
+                    resultBox.innerHTML += `
                         <div class="phy-legend">
-                            <h3>🗺️ 热力图说明 (Legend)</h3>
+                            <h3>🗺️ 热力图说明</h3>
                             <ul>
-                                <li><span class="swatch" style="background: #FCFDBF;"></span> <b>亮黄色</b>：高波峰 / 能量最大点 (Peak)</li>
-                                <li><span class="swatch" style="background: #B73779;"></span> <b>紫红色</b>：波浪扩散区域 (Ripples)</li>
-                                <li><span class="swatch" style="background: #000004;"></span> <b>暗黑色</b>：平静水面 / 零振幅区 (Calm)</li>
+                                <li><span class="swatch" style="background: #FCFDBF;"></span> <b>亮黄</b>：能量峰值 (Peak)</li>
+                                <li><span class="swatch" style="background: #B73779;"></span> <b>紫红</b>：扩散波纹 (Ripples)</li>
+                                <li><span class="swatch" style="background: #000004;"></span> <b>黑色</b>：平静区域 (Zero)</li>
                             </ul>
                         </div>
                     `;
-                    log('INFO', '加载物理场可视化图例...');
                 }
-                
-                resultBox.innerHTML = htmlStr;
-
             } else {
-                log('IO', '写入文本结果...');
                 resultBox.innerHTML = `<pre>${data.result}</pre>`;
             }
 
         } catch (e) {
-            log('ERROR', '网络通讯故障: ' + e.message);
-            document.getElementById('final-result').innerHTML = "❌ 失败";
+            log('ERROR', '网络故障: ' + e.message);
+            if(type === 'audit') {
+                document.getElementById('audit-output').innerHTML = "❌ 网络请求失败，请检查控制台";
+            } else {
+                document.getElementById('final-result').innerHTML = "❌ 失败";
+            }
         }
     }
 </script>
